@@ -1,0 +1,1 @@
+gcc -Wall mu.c `pkg-config "gstreamer-0.10" --cflags --libs`
