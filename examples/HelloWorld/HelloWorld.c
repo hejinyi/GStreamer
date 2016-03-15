@@ -8,6 +8,37 @@
 
 GstElement *pipeline, *source, *parser, *decoder, *conv, *sink;
 
+static void seek_to_time(GstElement *pipeline, gint64 time_nanoseconds) {
+    if (!gst_element_seek(pipeline,
+                1.0,
+                GST_FORMAT_TIME,
+                GST_SEEK_FLAG_FLUSH,
+                GST_SEEK_TYPE_SET,
+                time_nanoseconds,
+                GST_SEEK_TYPE_NONE,
+                GST_CLOCK_TIME_NONE))
+        g_print ("Seek failed!\n");
+}
+
+static gboolean cb_print_position(GstElement *pipeline) {
+    GstFormat fmt = GST_FORMAT_TIME;
+    gint64 pos, len;
+
+    if (gst_element_query_position (pipeline, &fmt, &pos)
+            && gst_element_query_duration (pipeline, &fmt, &len)) {
+        g_print ("Time: %" GST_TIME_FORMAT " / %" GST_TIME_FORMAT "\n",
+                GST_TIME_ARGS (pos), GST_TIME_ARGS (len));
+    }
+
+    if (pos/1000000000%10 == 0) {
+        g_print("position=%ld, now seek to 10s after.\n", pos/1000000000);
+        seek_to_time(pipeline, pos + 10000000000);
+    }
+
+    /* call me again */
+    return TRUE;
+}
+
 static gboolean bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
     GMainLoop *loop = data;
 
@@ -103,6 +134,10 @@ int main(int argc, char *argv[]) {
     /* Now set to playing and iterate. */
     g_print("Setting to PLAYING\n");
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
+
+    /* Query position every 200ms */
+    g_timeout_add (1000, (GSourceFunc) cb_print_position, pipeline);
+
     g_print("Running\n");
     g_main_loop_run(loop);
 
